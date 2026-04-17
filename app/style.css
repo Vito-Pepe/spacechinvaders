@@ -107,8 +107,15 @@ canvas {
 }
 
 .abtn {
-  font-family: inherit;
+  /* Safari: reset dell'aspetto nativo del <button> */
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-font-smoothing: antialiased;
+  outline: none;
+  /* Safari non eredita font-family sui <button>: lo esplicitiamo */
+  font-family: 'Press Start 2P', 'Courier New', monospace;
   font-size: clamp(8px, 1.4vw, 11px);
+  line-height: 1;
   letter-spacing: 0.08em;
   padding: 8px 14px;
   background: rgba(13,2,33,.55);

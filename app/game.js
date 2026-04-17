@@ -65,13 +65,18 @@ const INV_COLOR = ['#ff71ce', '#b967ff', '#01cdfe'];
 let audioCtx = null;
 
 function unlockAudio() {
-  if (audioCtx) {
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-  } else {
+  if (!audioCtx) {
     const AC = window.AudioContext || window.webkitAudioContext;
-    if (AC) audioCtx = new AC();
+    if (!AC) return;
+    audioCtx = new AC();
   }
-  startMusic();
+  const kick = () => startMusic();
+  // Safari: l'AudioContext parte in 'suspended' e va risvegliato prima di schedulare
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume().then(kick).catch(kick);
+  } else {
+    kick();
+  }
 }
 
 function playTone({ type='square', freqStart=600, freqEnd=200, duration=0.12,
@@ -173,14 +178,16 @@ const ctx    = canvas.getContext('2d');
 let S = 1;
 
 function resize() {
-  const hudH  = document.getElementById('hud').offsetHeight + 6;
-  const ctrlH = window.matchMedia('(pointer:coarse)').matches ? 70 : 0;
-  const avW   = window.innerWidth;
-  const avH   = window.innerHeight - hudH - ctrlH - 12;
+  const hudH     = document.getElementById('hud').offsetHeight + 6;
+  const actionsH = document.getElementById('game-actions').offsetHeight + 6;
+  const ctrlH    = window.matchMedia('(pointer:coarse)').matches ? 70 : 0;
+  const avW      = window.innerWidth;
+  const avH      = window.innerHeight - hudH - actionsH - ctrlH - 18;
   S = Math.min(avW / LW, avH / LH);
   canvas.width  = Math.floor(LW * S);
   canvas.height = Math.floor(LH * S);
   document.getElementById('hud').style.width = canvas.width + 'px';
+  document.getElementById('game-actions').style.width = canvas.width + 'px';
   document.getElementById('controls').style.width = canvas.width + 'px';
 }
 
