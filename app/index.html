@@ -13,7 +13,14 @@
       <span id="h-hi">HI-SCORE: 0</span>
       <span id="h-lives">♥ ♥ ♥</span>
     </div>
-    <canvas id="c"></canvas>
+    <div id="canvas-wrap">
+      <canvas id="c"></canvas>
+      <div id="overlay-box">
+        <div class="ov-label">PILOT NAME</div>
+        <input id="name-input" maxlength="8" autocomplete="off" spellcheck="false" placeholder="PLAYER" />
+        <button class="abtn" id="btn-start" type="button">▶ START</button>
+      </div>
+    </div>
     <div id="game-actions">
       <button class="abtn" id="btn-reset" type="button">⟲ RESET</button>
       <button class="abtn" id="btn-pause" type="button">⏸ PAUSE</button>

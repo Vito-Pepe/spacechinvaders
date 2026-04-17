@@ -61,6 +61,78 @@ const PAT = [
 
 const INV_COLOR = ['#ff71ce', '#b967ff', '#01cdfe'];
 
+// ── Wave formations (11 cols × 5 rows, '1' = invader present) ─────────────────
+// Il tipo di invader è determinato dalla riga (0 = 30pt, 1-2 = 20pt, 3-4 = 10pt).
+const WAVES = [
+  // Wave 1 — Classic
+  ["11111111111",
+   "11111111111",
+   "11111111111",
+   "11111111111",
+   "11111111111"],
+  // Wave 2 — Diamond
+  ["00011111000",
+   "01111111110",
+   "11111111111",
+   "01111111110",
+   "00011111000"],
+  // Wave 3 — Pyramid
+  ["00000100000",
+   "00001110000",
+   "00011111000",
+   "00111111100",
+   "01111111110"],
+  // Wave 4 — H-shape (due torri + ponte)
+  ["11100000111",
+   "11100000111",
+   "11111111111",
+   "11100000111",
+   "11100000111"],
+  // Wave 5 — Checkerboard
+  ["10101010101",
+   "01010101010",
+   "10101010101",
+   "01010101010",
+   "10101010101"],
+  // Wave 6 — Reverse V (punta verso il basso)
+  ["11111111111",
+   "01111111110",
+   "00111111100",
+   "00011111000",
+   "00001110000"],
+  // Wave 7 — Double cross
+  ["11000100011",
+   "01101110110",
+   "00111111100",
+   "01101110110",
+   "11000100011"],
+];
+
+// ── Persistenza (hi-score top10 + nome pilota) ────────────────────────────────
+const HISCORE_KEY = 'vaporwave_invaders_hiscores_v1';
+const NAME_KEY    = 'vaporwave_invaders_pilot_v1';
+const TOP_N       = 10;
+
+function loadHiScores() {
+  try { const raw = localStorage.getItem(HISCORE_KEY); return raw ? JSON.parse(raw) : []; }
+  catch { return []; }
+}
+function saveHiScores(list) {
+  try { localStorage.setItem(HISCORE_KEY, JSON.stringify(list)); } catch {}
+}
+function addHiScore(name, score, level) {
+  const list = loadHiScores();
+  const entry = { name: (name || 'PLAYER').toUpperCase().slice(0,8), score, level, date: Date.now() };
+  list.push(entry);
+  list.sort((a,b) => b.score - a.score || a.date - b.date);
+  const top = list.slice(0, TOP_N);
+  saveHiScores(top);
+  // Ritorna l'indice dell'entry appena inserita nella top list (-1 se fuori top)
+  return top.indexOf(entry);
+}
+function loadName() { try { return localStorage.getItem(NAME_KEY) || ''; } catch { return ''; } }
+function saveName(n) { try { localStorage.setItem(NAME_KEY, (n||'').toUpperCase().slice(0,8)); } catch {} }
+
 // ── Audio (Web Audio API, sintesi al volo) ────────────────────────────────────
 let audioCtx = null;
 
@@ -233,8 +305,14 @@ let player, pBullets, eBullets, invaders, shields, ufo, particles;
 let invDir, invMoveTimer, animFrame;
 let eBulletTimer, ufoTimer;
 let paused = false;
+let lastRunIdx = -1;  // posizione nel top10 dell'ultima run (-1 se fuori)
 
 hiScore = 0; level = 1;
+// Allinea hi-score mostrato in HUD al miglior punteggio salvato
+{
+  const list = loadHiScores();
+  if (list.length) hiScore = list[0].score;
+}
 
 function togglePause() {
   if (state !== 'playing') return;  // si può mettere in pausa solo durante il gameplay
@@ -253,8 +331,14 @@ function resetPauseBtn() {
 }
 
 function initGame() {
-  score  = 0;
-  lives  = 3;
+  score       = 0;
+  lives       = 3;
+  level       = 1;
+  lastRunIdx  = -1;
+  initWave();
+}
+
+function initWave() {
   animFrame    = 0;
   invDir       = 1;
   invMoveTimer = 0;
@@ -267,21 +351,25 @@ function initGame() {
 
   player = { x: LW/2, y: LH - 46, w: 44, h: 22, cooldown: 0 };
 
-  // Invaders: 11×5 grid
+  // Invaders da WAVES (cicla quando supera l'ultimo pattern)
   invaders = [];
-  const COLS=11, ROWS=5, IW=36, IH=22, GX=16, GY=16;
+  const wave = WAVES[(level - 1) % WAVES.length];
+  const ROWS = wave.length;            // sempre 5
+  const COLS = wave[0].length;         // sempre 11
+  const IW=36, IH=22, GX=16, GY=16;
   const gW     = COLS*IW + (COLS-1)*GX;
   const startX = (LW - gW)/2 + IW/2;
   const startY = 68;
   for (let r=0; r<ROWS; r++) {
     for (let c=0; c<COLS; c++) {
+      if (wave[r][c] !== '1') continue;
       const type = r===0 ? 0 : r<=2 ? 1 : 2;
       const pts  = [30,20,10][type];
       invaders.push({ x: startX + c*(IW+GX), y: startY + r*(IH+GY), w:IW, h:IH, type, pts, alive:true });
     }
   }
 
-  // Shields: 4 bunkers
+  // Shields: 4 bunkers (sempre rigenerati ad ogni wave)
   shields = [];
   const N=4, SW=56, SH=36, BK=7;
   const sp = LW/(N+1);
@@ -292,7 +380,6 @@ function initGame() {
     const cols = Math.floor(SW/BK), rows = Math.floor(SH/BK);
     for (let r=0; r<rows; r++) {
       for (let c=0; c<cols; c++) {
-        // Arch: remove inner bottom 2 rows center, top corners
         if (r < 1 && (c < 2 || c >= cols-2)) continue;
         if (r >= rows-2 && c >= 2 && c < cols-2) continue;
         blocks.push({ x: sx+c*BK, y: sy+r*BK, s: BK, hp: 4 });
@@ -331,8 +418,11 @@ function update(dt) {
   const alive = invaders.filter(i => i.alive);
   if (!alive.length) { winLevel(); return; }
 
-  const speedup = 1 + (55 - alive.length) / 55 * 2.8;
-  const baseInterval = Math.max(0.08, 0.55 / speedup);
+  // Difficoltà: più invader morti = più veloce, + bonus per livello
+  const totalInWave = Math.max(1, invaders.length);
+  const speedup = 1 + (totalInWave - alive.length) / totalInWave * 2.8;
+  const levelBoost = 1 + (level - 1) * 0.08;  // +8% di velocità per wave
+  const baseInterval = Math.max(0.07, 0.55 / (speedup * levelBoost));
   invMoveTimer += dt;
 
   if (invMoveTimer >= baseInterval) {
@@ -451,7 +541,14 @@ function update(dt) {
   hiScore = Math.max(hiScore, score);
 }
 
-function endGame()  { hiScore = Math.max(hiScore,score); state='gameover'; }
+function endGame() {
+  hiScore = Math.max(hiScore, score);
+  // Salva il punteggio nella top10 (anche score=0 per coerenza del flusso UI)
+  const name = loadName() || (document.getElementById('name-input')?.value || 'PLAYER');
+  saveName(name);
+  lastRunIdx = addHiScore(name, score, level);
+  state = 'gameover';
+}
 function winLevel() { hiScore = Math.max(hiScore,score); level++; state='win'; }
 
 function spawnExplosion(x, y, color) {
@@ -616,44 +713,46 @@ function drawGroundLine() {
 function drawStartScreen() {
   drawBg();
 
-  // Glowing title
-  text('VAPORWAVE', LW/2, 118, '#ff71ce', 26);
-  text('INVADERS',  LW/2, 155, '#01cdfe', 26);
+  // Titolo
+  text('VAPORWAVE', LW/2, 68, '#ff71ce', 22);
+  text('INVADERS',  LW/2, 102, '#01cdfe', 22);
+  text('← → TO MOVE   SPACE TO FIRE', LW/2, 134, '#b967ff', 7);
 
-  if (Date.now() % 1100 < 660)
-    text('PRESS SPACE TO START', LW/2, 225, '#b967ff', 9);
+  // Leaderboard top 5 (spazio per l'overlay del nome sotto)
+  drawLeaderboard(LW/2, 170, null, 5);
+}
 
-  text('— SCORE ADVANCE TABLE —', LW/2, 285, '#fffb96', 8);
+function drawLeaderboard(cx, startY, highlightIdx, limit) {
+  const max = limit || TOP_N;
+  text('— TOP ' + max + ' PILOTS —', cx, startY, '#fffb96', 9);
 
-  const tableRows = [
-    { label:'= 30 PTS', type:0 },
-    { label:'= 20 PTS', type:1 },
-    { label:'= 10 PTS', type:2 },
-    { label:'= ??? PTS', ufo:true },
-  ];
+  const list = loadHiScores().slice(0, max);
+  if (!list.length) {
+    text('NO SCORES YET — BE THE FIRST', cx, startY + 30, '#b967ff', 7);
+    return;
+  }
 
-  tableRows.forEach((row, i) => {
-    const ty = 320 + i * 46;
-    const mx = LW/2 - 100;
+  const ROW_H = 22;
+  const colRank  = cx - 170;
+  const colName  = cx - 140;
+  const colScore = cx + 60;
+  const colLvl   = cx + 170;
+  text('#',     colRank,  startY + 24, '#b967ff', 7, 'left');
+  text('PILOT', colName,  startY + 24, '#b967ff', 7, 'left');
+  text('SCORE', colScore, startY + 24, '#b967ff', 7, 'right');
+  text('WAVE',  colLvl,   startY + 24, '#b967ff', 7, 'right');
 
-    if (row.ufo) {
-      ctx.fillStyle = '#ff71ce'; glow('#ff71ce', 8);
-      ctx.beginPath(); ctx.ellipse(p(mx+10), p(ty+4), p(14), p(6), 0, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(p(mx+10), p(ty),   p(7),  p(5), 0, 0, Math.PI*2); ctx.fill();
-      noglow();
-    } else {
-      const pat = PAT[row.type][0];
-      const pw = 20/11, ph = 14/8;
-      ctx.fillStyle = INV_COLOR[row.type]; glow(INV_COLOR[row.type], 6);
-      pat.forEach((r,ri)=> r.forEach((cell,ci)=>{
-        if (cell) ctx.fillRect(p(mx-2+ci*pw), p(ty-6+ri*ph), Math.max(1,p(pw)-.4), Math.max(1,p(ph)-.4));
-      }));
-      noglow();
-    }
-    text(row.label, LW/2 + 28, ty + 7, row.ufo ? '#ff71ce' : INV_COLOR[row.type], 9, 'left');
+  list.forEach((e, i) => {
+    const y = startY + 44 + i * ROW_H;
+    const isNew = (highlightIdx === i);
+    const blink = isNew ? (Date.now() % 600 < 300) : true;
+    if (!blink) return;
+    const col = isNew ? '#fffb96' : (i === 0 ? '#ff71ce' : (i < 3 ? '#01cdfe' : '#b967ff'));
+    text(String(i+1).padStart(2,' '), colRank,  y, col, 8, 'left');
+    text(e.name,                      colName,  y, col, 8, 'left');
+    text(String(e.score),             colScore, y, col, 8, 'right');
+    text('W' + (e.level || 1),        colLvl,   y, col, 8, 'right');
   });
-
-  text('← → TO MOVE   SPACE TO FIRE', LW/2, 543, '#4a1a6e', 7);
 }
 
 function overlay() {
@@ -663,18 +762,24 @@ function overlay() {
 
 function drawGameOver() {
   overlay();
-  text('GAME OVER', LW/2, LH*.38, '#ff71ce', 24);
-  text('SCORE: ' + score, LW/2, LH*.52, '#01cdfe', 11);
+  text('GAME OVER', LW/2, 70, '#ff71ce', 22);
+  if (lastRunIdx >= 0) {
+    text('NEW HIGH SCORE  #' + (lastRunIdx + 1), LW/2, 108, '#fffb96', 10);
+  } else {
+    text('SCORE: ' + score, LW/2, 108, '#01cdfe', 10);
+  }
+  drawLeaderboard(LW/2, 140, lastRunIdx);
   if (Date.now() % 1100 < 660)
-    text('SPACE / TAP TO RETRY', LW/2, LH*.65, '#b967ff', 8);
+    text('SPACE / TAP TO RETRY', LW/2, 548, '#b967ff', 8);
 }
 
 function drawWinScreen() {
   overlay();
-  text('WAVE CLEARED!', LW/2, LH*.38, '#fffb96', 20);
-  text('SCORE: ' + score, LW/2, LH*.52, '#01cdfe', 11);
+  text('WAVE ' + (level - 1) + ' CLEARED!', LW/2, LH*.32, '#fffb96', 18);
+  text('SCORE: ' + score, LW/2, LH*.44, '#01cdfe', 11);
+  text('NEXT: WAVE ' + level, LW/2, LH*.54, '#05ffa1', 10);
   if (Date.now() % 1100 < 660)
-    text('SPACE / TAP TO CONTINUE', LW/2, LH*.65, '#b967ff', 8);
+    text('SPACE / TAP TO CONTINUE', LW/2, LH*.68, '#b967ff', 8);
 }
 
 function drawPausedScreen() {
@@ -712,6 +817,17 @@ function render() {
   // RESET e MENU visibili solo in gameplay (PAUSE e MUSIC sempre visibili)
   const ga = document.getElementById('game-actions');
   if (ga) ga.classList.toggle('hide-play', state !== 'playing');
+
+  // Overlay nome pilota: visibile solo su start screen
+  const ov = document.getElementById('overlay-box');
+  if (ov) ov.classList.toggle('visible', state === 'start');
+
+  // HUD: mostra wave corrente in gameplay
+  if (state === 'playing' || state === 'win') {
+    document.getElementById('h-hi').textContent = 'WAVE ' + level;
+  } else {
+    document.getElementById('h-hi').textContent = 'HI: ' + hiScore;
+  }
 }
 
 // ── Game loop ─────────────────────────────────────────────────────────────────
@@ -726,6 +842,12 @@ function loop(t) {
 
 // ── Input ─────────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
+  // Se l'utente sta scrivendo nel campo nome, non intercettare i tasti di gioco
+  const typing = e.target && e.target.tagName === 'INPUT';
+  if (typing) {
+    if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); if (state === 'start') go(); }
+    return;
+  }
   unlockAudio();
   KEYS[e.key] = true;
   if (e.key === ' ' || e.key === 'Space') {
@@ -739,8 +861,25 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keyup', e => { KEYS[e.key] = false; });
 
 function go() {
-  if (state === 'start' || state === 'gameover') { initGame(); resetPauseBtn(); state = 'playing'; }
-  else if (state === 'win') { initGame(); resetPauseBtn(); state = 'playing'; }
+  if (state === 'start' || state === 'gameover') {
+    // Partita nuova: reset totale (score, vite, livello)
+    commitNameFromInput();
+    initGame();
+    resetPauseBtn();
+    state = 'playing';
+  } else if (state === 'win') {
+    // Avanza alla wave successiva mantenendo score/vite
+    initWave();
+    resetPauseBtn();
+    state = 'playing';
+  }
+}
+
+function commitNameFromInput() {
+  const el = document.getElementById('name-input');
+  if (!el) return;
+  const v = (el.value || '').trim();
+  if (v) saveName(v);
 }
 
 // Touch on canvas (tap to advance state or fire)
@@ -774,10 +913,25 @@ function clickBtn(id, fn) {
   el.addEventListener('touchstart', h, { passive: false });
 }
 
-clickBtn('btn-reset', () => { initGame(); resetPauseBtn(); state = 'playing'; });
+clickBtn('btn-reset', () => { commitNameFromInput(); initGame(); resetPauseBtn(); state = 'playing'; });
 clickBtn('btn-menu',  () => { resetPauseBtn(); state = 'start'; });
 clickBtn('btn-pause', togglePause);
 clickBtn('btn-music', toggleMusic);
+clickBtn('btn-start', () => { if (state === 'start') go(); });
+
+// Input nome: prefill dal localStorage e salvataggio al blur
+const nameInput = document.getElementById('name-input');
+if (nameInput) {
+  nameInput.value = loadName();
+  nameInput.addEventListener('input', () => {
+    // Forza uppercase e caratteri consentiti
+    nameInput.value = nameInput.value.toUpperCase().replace(/[^A-Z0-9 _-]/g, '').slice(0, 8);
+  });
+  nameInput.addEventListener('blur', commitNameFromInput);
+}
+
+// Canvas tap durante start: non avanzare se il tap è sull'overlay del nome
+// (l'overlay cattura già i suoi touch, ma forziamo che canvas.touchstart rispetti l'overlay)
 
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', resize);

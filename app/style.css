@@ -52,6 +52,66 @@ body::after {
   width: 100%;
 }
 
+/* Canvas wrapper: posiziona l'overlay rispetto al canvas stesso */
+#canvas-wrap {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+
+/* Overlay nome pilota + START (mostrato solo su start screen) */
+#overlay-box {
+  position: absolute;
+  left: 50%;
+  top: 78%;
+  transform: translate(-50%, -50%);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 15;
+  padding: 14px 18px;
+  background: rgba(13,2,33,.72);
+  border: 1.5px solid var(--cyan);
+  border-radius: 4px;
+  box-shadow:
+    0 0 10px rgba(1,205,254,.5),
+    0 0 26px rgba(1,205,254,.25),
+    inset 0 0 8px rgba(1,205,254,.15);
+}
+#overlay-box.visible { display: flex; }
+
+.ov-label {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: clamp(7px, 1.4vw, 10px);
+  color: var(--yellow);
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 4px var(--yellow), 0 0 10px var(--yellow);
+}
+
+#name-input {
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: clamp(10px, 1.8vw, 14px);
+  letter-spacing: 0.14em;
+  text-align: center;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  width: min(200px, 60vw);
+  background: rgba(13,2,33,.6);
+  color: var(--pink);
+  caret-color: var(--pink);
+  border: 1.5px solid var(--pink);
+  border-radius: 3px;
+  text-shadow: 0 0 4px var(--pink), 0 0 10px var(--pink);
+  box-shadow:
+    0 0 8px rgba(255,113,206,.5),
+    inset 0 0 6px rgba(255,113,206,.15);
+}
+#name-input::placeholder { color: rgba(255,113,206,.45); }
+
 #hud {
   display: flex;
   justify-content: space-between;
