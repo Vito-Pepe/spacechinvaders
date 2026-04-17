@@ -1,0 +1,116 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+:root {
+  --pink:   #ff71ce;
+  --cyan:   #01cdfe;
+  --purple: #b967ff;
+  --yellow: #fffb96;
+  --green:  #05ffa1;
+  --bg:     #0d0221;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* CRT vignette */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(13,2,33,.7) 100%);
+  pointer-events: none; z-index: 20;
+}
+
+/* Scanlines */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    transparent, transparent 2px,
+    rgba(0,0,0,.07) 2px, rgba(0,0,0,.07) 4px
+  );
+  pointer-events: none; z-index: 20;
+}
+
+#wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+#hud {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 6px;
+  font-size: clamp(6px, 1.4vw, 11px);
+  color: var(--pink);
+  text-shadow: 0 0 8px var(--pink);
+  letter-spacing: 0.05em;
+}
+
+#hud span:nth-child(2) { color: var(--cyan); text-shadow: 0 0 8px var(--cyan); }
+#hud span:nth-child(3) { color: var(--yellow); text-shadow: 0 0 8px var(--yellow); }
+
+canvas {
+  display: block;
+  border: 1px solid var(--purple);
+  box-shadow:
+    0 0 12px var(--purple),
+    0 0 40px rgba(185,103,255,.25),
+    0 0 80px rgba(255,113,206,.1);
+}
+
+/* Mobile controls */
+#controls {
+  display: none;
+  width: 100%;
+  padding: 6px 8px;
+  gap: 6px;
+}
+
+@media (pointer: coarse) {
+  #controls { display: flex; justify-content: space-between; align-items: center; }
+}
+
+.cbtn {
+  flex: 1;
+  padding: clamp(10px,3vw,18px) 0;
+  background: rgba(185,103,255,.15);
+  border: 1.5px solid var(--purple);
+  border-radius: 4px;
+  color: var(--cyan);
+  font-family: inherit;
+  font-size: clamp(12px,3.5vw,20px);
+  text-align: center;
+  cursor: pointer;
+  user-select: none; -webkit-user-select: none;
+  box-shadow: 0 0 8px var(--purple);
+  text-shadow: 0 0 8px var(--cyan);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cbtn:active { background: rgba(185,103,255,.35); }
+
+#btn-fire {
+  background: rgba(255,113,206,.15);
+  border-color: var(--pink);
+  color: var(--yellow);
+  text-shadow: 0 0 8px var(--yellow);
+  box-shadow: 0 0 8px var(--pink);
+  flex: 0.9;
+}
