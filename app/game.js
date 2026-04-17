@@ -178,11 +178,15 @@ const ctx    = canvas.getContext('2d');
 let S = 1;
 
 function resize() {
-  const hudH     = document.getElementById('hud').offsetHeight + 6;
-  const actionsH = document.getElementById('game-actions').offsetHeight + 6;
-  const ctrlH    = window.matchMedia('(pointer:coarse)').matches ? 70 : 0;
-  const avW      = window.innerWidth;
-  const avH      = window.innerHeight - hudH - actionsH - ctrlH - 18;
+  const hudH     = document.getElementById('hud').offsetHeight;
+  const actionsH = document.getElementById('game-actions').offsetHeight;
+  const ctrlH    = window.matchMedia('(pointer:coarse)').matches
+                     ? document.getElementById('controls').offsetHeight
+                     : 0;
+  // Buffer generoso: gap del flex (12px) + eventuale reflow font (~16px)
+  const BUFFER = 32;
+  const avW    = window.innerWidth;
+  const avH    = window.innerHeight - hudH - actionsH - ctrlH - BUFFER;
   S = Math.min(avW / LW, avH / LH);
   canvas.width  = Math.floor(LW * S);
   canvas.height = Math.floor(LH * S);
@@ -713,8 +717,16 @@ clickBtn('btn-reset', () => { initGame(); state = 'playing'; });
 clickBtn('btn-menu',  () => { state = 'start'; });
 
 window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', resize);
+// Ri-adatta quando Press Start 2P finisce di caricare (cambia l'altezza di HUD/pulsanti)
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(resize);
+}
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 resize();
+// Fallback per browser senza document.fonts.ready: ri-misura dopo il caricamento del font
+setTimeout(resize, 300);
+setTimeout(resize, 1200);
 state = 'start';
 requestAnimationFrame(loop);
