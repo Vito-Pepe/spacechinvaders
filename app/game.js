@@ -65,9 +65,13 @@ const INV_COLOR = ['#ff71ce', '#b967ff', '#01cdfe'];
 let audioCtx = null;
 
 function unlockAudio() {
-  if (audioCtx) { if (audioCtx.state === 'suspended') audioCtx.resume(); return; }
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (AC) audioCtx = new AC();
+  if (audioCtx) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } else {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) audioCtx = new AC();
+  }
+  startMusic();
 }
 
 function playTone({ type='square', freqStart=600, freqEnd=200, duration=0.12,
@@ -95,6 +99,71 @@ function sfxPlayerShoot() {
 // Enemy shoot — tono basso sporco (sawtooth + sweep lineare)
 function sfxEnemyShoot() {
   playTone({ type:'sawtooth', freqStart: 260, freqEnd:  70, duration: 0.18, gain: 0.09, sweep:'lin' });
+}
+
+// ── Musica di sottofondo (pad vaporwave, progressione ii-V-I-vi slow) ─────────
+// Accordi con settima maggiore/dominante per quel sapore dreamy/mallwave.
+const MUSIC_CHORDS = [
+  [261.63, 329.63, 392.00, 493.88],  // Cmaj7   (C E G B)
+  [220.00, 261.63, 329.63, 392.00],  // Am7     (A C E G)
+  [174.61, 220.00, 261.63, 329.63],  // Fmaj7   (F A C E)
+  [196.00, 246.94, 293.66, 349.23],  // G7      (G B D F)
+];
+const CHORD_DUR = 3.2;  // secondi per accordo
+
+let musicStarted = false;
+let musicGain    = null;
+let musicTimer   = null;
+
+function startMusic() {
+  if (musicStarted || !audioCtx) return;
+  musicStarted = true;
+
+  musicGain = audioCtx.createGain();
+  musicGain.gain.value = 0.07;
+  musicGain.connect(audioCtx.destination);
+
+  let idx = 0;
+
+  const playChord = () => {
+    if (!audioCtx) return;
+    const chord = MUSIC_CHORDS[idx];
+    const t0    = audioCtx.currentTime;
+
+    // Pad: 4 voci sine leggermente detunate per un effetto chorus lo-fi
+    chord.forEach((f, i) => {
+      const osc = audioCtx.createOscillator();
+      const amp = audioCtx.createGain();
+      osc.type           = 'sine';
+      osc.detune.value   = (i % 2 === 0 ? -7 : 7);
+      osc.frequency.value = f;
+      amp.gain.setValueAtTime(0, t0);
+      amp.gain.linearRampToValueAtTime(0.22, t0 + 0.7);
+      amp.gain.setValueAtTime(0.22, t0 + CHORD_DUR - 0.6);
+      amp.gain.linearRampToValueAtTime(0, t0 + CHORD_DUR);
+      osc.connect(amp).connect(musicGain);
+      osc.start(t0);
+      osc.stop(t0 + CHORD_DUR + 0.05);
+    });
+
+    // Bassline: triangle un'ottava sotto la fondamentale
+    const bass = audioCtx.createOscillator();
+    const bAmp = audioCtx.createGain();
+    bass.type           = 'triangle';
+    bass.frequency.value = chord[0] / 2;
+    bAmp.gain.setValueAtTime(0, t0);
+    bAmp.gain.linearRampToValueAtTime(0.38, t0 + 0.15);
+    bAmp.gain.setValueAtTime(0.38, t0 + CHORD_DUR - 0.4);
+    bAmp.gain.linearRampToValueAtTime(0, t0 + CHORD_DUR);
+    bass.connect(bAmp).connect(musicGain);
+    bass.start(t0);
+    bass.stop(t0 + CHORD_DUR + 0.05);
+
+    idx = (idx + 1) % MUSIC_CHORDS.length;
+  };
+
+  playChord();
+  musicTimer = setInterval(playChord, CHORD_DUR * 1000);
 }
 
 // ── Canvas & scale ────────────────────────────────────────────────────────────
@@ -623,6 +692,18 @@ function holdBtn(id, flag) {
 holdBtn('btn-left',  'left');
 holdBtn('btn-right', 'right');
 holdBtn('btn-fire',  'fire');
+
+// Action buttons: reset & back to menu
+function clickBtn(id, fn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const h = e => { e.preventDefault(); unlockAudio(); fn(); };
+  el.addEventListener('click', h);
+  el.addEventListener('touchstart', h, { passive: false });
+}
+
+clickBtn('btn-reset', () => { initGame(); state = 'playing'; });
+clickBtn('btn-menu',  () => { state = 'start'; });
 
 window.addEventListener('resize', resize);
 
