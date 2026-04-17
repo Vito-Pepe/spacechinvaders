@@ -1,0 +1,8 @@
+services:
+  invaders:
+    build: .
+    container_name: invaders
+    ports:
+      # Porta 8400 sul Pi — cambiala se 8400 e' gia' occupata
+      - "8400:80"
+    restart: unless-stopped
