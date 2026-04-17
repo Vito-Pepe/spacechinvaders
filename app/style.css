@@ -97,13 +97,46 @@ canvas {
   filter: saturate(1.2) brightness(1.08);
 }
 
-/* Game actions (RESET / MENU) — always visible */
+/* Game actions (RESET / PAUSE / MUSIC / MENU) */
 #game-actions {
   display: flex;
   justify-content: center;
   gap: 10px;
   width: 100%;
   padding: 2px 8px;
+}
+
+/* RESET + MENU visibili solo durante il gameplay */
+#game-actions.hide-play #btn-reset,
+#game-actions.hide-play #btn-menu {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Stato "muted": il pulsante musica si spegne visivamente */
+#btn-music.muted {
+  opacity: 0.55;
+  color: var(--purple);
+  border-color: var(--purple);
+  text-shadow:
+    0 0 4px var(--purple),
+    0 0 10px var(--purple);
+  box-shadow:
+    0 0 8px rgba(185,103,255,.45),
+    inset 0 0 6px rgba(185,103,255,.2);
+}
+
+/* Stato "paused": il pulsante pausa si colora di giallo */
+#btn-pause.active {
+  color: var(--yellow);
+  border-color: var(--yellow);
+  text-shadow:
+    0 0 4px var(--yellow),
+    0 0 10px var(--yellow);
+  box-shadow:
+    0 0 8px rgba(255,251,150,.55),
+    0 0 18px rgba(255,251,150,.3),
+    inset 0 0 6px rgba(255,251,150,.2);
 }
 
 .abtn {

@@ -119,6 +119,31 @@ const CHORD_DUR = 3.2;  // secondi per accordo
 let musicStarted = false;
 let musicGain    = null;
 let musicTimer   = null;
+let musicMuted   = false;
+
+function toggleMusic() {
+  if (!audioCtx || !musicGain) {
+    // Musica non ancora avviata: prova ad avviarla (utente ha cliccato, quindi è un gesto valido)
+    musicMuted = false;
+    unlockAudio();
+    updateMusicBtn();
+    return;
+  }
+  musicMuted = !musicMuted;
+  const target = musicMuted ? 0 : 0.07;
+  const t = audioCtx.currentTime;
+  musicGain.gain.cancelScheduledValues(t);
+  musicGain.gain.setValueAtTime(musicGain.gain.value, t);
+  musicGain.gain.linearRampToValueAtTime(target, t + 0.25);
+  updateMusicBtn();
+}
+
+function updateMusicBtn() {
+  const b = document.getElementById('btn-music');
+  if (!b) return;
+  if (musicMuted) { b.classList.add('muted');    b.textContent = '♪ MUSIC OFF'; }
+  else            { b.classList.remove('muted'); b.textContent = '♪ MUSIC';     }
+}
 
 function startMusic() {
   if (musicStarted || !audioCtx) return;
@@ -203,8 +228,25 @@ let state, score, hiScore, lives, level;
 let player, pBullets, eBullets, invaders, shields, ufo, particles;
 let invDir, invMoveTimer, animFrame;
 let eBulletTimer, ufoTimer;
+let paused = false;
 
 hiScore = 0; level = 1;
+
+function togglePause() {
+  if (state !== 'playing') return;  // si può mettere in pausa solo durante il gameplay
+  paused = !paused;
+  const b = document.getElementById('btn-pause');
+  if (b) {
+    if (paused) { b.classList.add('active');    b.textContent = '▶ RESUME'; }
+    else        { b.classList.remove('active'); b.textContent = '⏸ PAUSE';  }
+  }
+}
+
+function resetPauseBtn() {
+  paused = false;
+  const b = document.getElementById('btn-pause');
+  if (b) { b.classList.remove('active'); b.textContent = '⏸ PAUSE'; }
+}
 
 function initGame() {
   score  = 0;
@@ -259,6 +301,7 @@ function initGame() {
 // ── Update ────────────────────────────────────────────────────────────────────
 function update(dt) {
   if (state !== 'playing') return;
+  if (paused) return;
 
   // Player movement
   const spd = 270;
@@ -630,6 +673,13 @@ function drawWinScreen() {
     text('SPACE / TAP TO CONTINUE', LW/2, LH*.65, '#b967ff', 8);
 }
 
+function drawPausedScreen() {
+  overlay();
+  text('PAUSED', LW/2, LH*.44, '#fffb96', 26);
+  if (Date.now() % 1100 < 660)
+    text('PRESS P OR TAP RESUME', LW/2, LH*.58, '#b967ff', 8);
+}
+
 // ── Render ────────────────────────────────────────────────────────────────────
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -653,6 +703,11 @@ function render() {
 
   if (state === 'gameover') drawGameOver();
   if (state === 'win')      drawWinScreen();
+  if (state === 'playing' && paused) drawPausedScreen();
+
+  // RESET e MENU visibili solo in gameplay (PAUSE e MUSIC sempre visibili)
+  const ga = document.getElementById('game-actions');
+  if (ga) ga.classList.toggle('hide-play', state !== 'playing');
 }
 
 // ── Game loop ─────────────────────────────────────────────────────────────────
@@ -673,13 +728,15 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     if (state !== 'playing') go();
   }
+  if (e.key === 'p' || e.key === 'P') { e.preventDefault(); togglePause(); }
+  if (e.key === 'm' || e.key === 'M') { e.preventDefault(); toggleMusic(); }
   if (e.key.startsWith('Arrow')) e.preventDefault();
 });
 document.addEventListener('keyup', e => { KEYS[e.key] = false; });
 
 function go() {
-  if (state === 'start' || state === 'gameover') { initGame(); state = 'playing'; }
-  else if (state === 'win') { initGame(); state = 'playing'; }
+  if (state === 'start' || state === 'gameover') { initGame(); resetPauseBtn(); state = 'playing'; }
+  else if (state === 'win') { initGame(); resetPauseBtn(); state = 'playing'; }
 }
 
 // Touch on canvas (tap to advance state or fire)
@@ -713,8 +770,10 @@ function clickBtn(id, fn) {
   el.addEventListener('touchstart', h, { passive: false });
 }
 
-clickBtn('btn-reset', () => { initGame(); state = 'playing'; });
-clickBtn('btn-menu',  () => { state = 'start'; });
+clickBtn('btn-reset', () => { initGame(); resetPauseBtn(); state = 'playing'; });
+clickBtn('btn-menu',  () => { resetPauseBtn(); state = 'start'; });
+clickBtn('btn-pause', togglePause);
+clickBtn('btn-music', toggleMusic);
 
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', resize);
