@@ -208,10 +208,14 @@ function resize() {
   const ctrlH    = window.matchMedia('(pointer:coarse)').matches
                      ? document.getElementById('controls').offsetHeight
                      : 0;
-  // Buffer generoso: gap del flex (12px) + eventuale reflow font (~16px)
-  const BUFFER = 32;
-  const avW    = window.innerWidth;
-  const avH    = window.innerHeight - hudH - actionsH - ctrlH - BUFFER;
+  // Buffer generoso: gap del flex + eventuale reflow font + safe area Safari
+  const BUFFER = 44;
+  // Safari: innerHeight può sovrastimare (include toolbar). visualViewport è la misura reale.
+  const vv     = window.visualViewport;
+  const viewW  = vv ? vv.width  : window.innerWidth;
+  const viewH  = vv ? vv.height : window.innerHeight;
+  const avW    = viewW;
+  const avH    = viewH - hudH - actionsH - ctrlH - BUFFER;
   S = Math.min(avW / LW, avH / LH);
   canvas.width  = Math.floor(LW * S);
   canvas.height = Math.floor(LH * S);
@@ -777,6 +781,10 @@ clickBtn('btn-music', toggleMusic);
 
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', resize);
+// Safari: visualViewport cambia quando appare/scompare la toolbar
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', resize);
+}
 // Ri-adatta quando Press Start 2P finisce di caricare (cambia l'altezza di HUD/pulsanti)
 if (document.fonts && document.fonts.ready) {
   document.fonts.ready.then(resize);
@@ -784,8 +792,11 @@ if (document.fonts && document.fonts.ready) {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 resize();
-// Fallback per browser senza document.fonts.ready: ri-misura dopo il caricamento del font
+// Fallback per browser senza document.fonts.ready: ri-misura dopo il caricamento del font.
+// Passaggi multipli coprono Safari (layout tardivo) e Chrome (font swap).
 setTimeout(resize, 300);
 setTimeout(resize, 1200);
+setTimeout(resize, 2500);
+window.addEventListener('load', resize);
 state = 'start';
 requestAnimationFrame(loop);

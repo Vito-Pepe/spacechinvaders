@@ -100,8 +100,9 @@ canvas {
 /* Game actions (RESET / PAUSE / MUSIC / MENU) */
 #game-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
   padding: 2px 8px;
 }
