@@ -23,12 +23,6 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  /* Safe-area per iPhone con notch/dynamic island */
-  padding:
-    env(safe-area-inset-top)
-    env(safe-area-inset-right)
-    env(safe-area-inset-bottom)
-    env(safe-area-inset-left);
 }
 
 /* CRT vignette */
@@ -265,7 +259,7 @@ canvas {
   display: none;
   width: 100%;
   padding: 6px 8px;
-  gap: 8px;
+  gap: 6px;
 }
 
 @media (pointer: coarse) {
@@ -274,13 +268,13 @@ canvas {
 
 .cbtn {
   flex: 1;
-  padding: clamp(14px, 4.5vw, 22px) 0;
+  padding: clamp(10px,3vw,18px) 0;
   background: rgba(185,103,255,.15);
   border: 1.5px solid var(--purple);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--cyan);
   font-family: inherit;
-  font-size: clamp(16px, 5vw, 26px);
+  font-size: clamp(12px,3.5vw,20px);
   text-align: center;
   cursor: pointer;
   user-select: none; -webkit-user-select: none;
@@ -291,7 +285,6 @@ canvas {
     0 0 6px var(--cyan),
     0 0 14px var(--cyan);
   -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
 }
 
 .cbtn:active { background: rgba(185,103,255,.4); }
@@ -306,32 +299,5 @@ canvas {
   box-shadow:
     0 0 10px var(--pink),
     0 0 20px rgba(255,113,206,.4);
-  flex: 1.1;
-  font-size: clamp(12px, 3.8vw, 20px);
-  letter-spacing: 0.12em;
-}
-
-/* ── Portrait phone tweaks ─────────────────────────────────────────────────── */
-@media (orientation: portrait) and (max-width: 600px) {
-  /* HUD più compatto in verticale */
-  #hud {
-    font-size: clamp(7px, 3vw, 11px);
-    padding: 0 6px;
-  }
-  #h-lives {
-    font-size: clamp(14px, 5vw, 22px);
-    letter-spacing: 0.12em;
-  }
-  /* Pulsanti azione più piccoli per non rubare spazio al canvas */
-  .abtn {
-    font-size: clamp(7px, 2.6vw, 10px);
-    padding: 7px 10px;
-    letter-spacing: 0.04em;
-  }
-  #game-actions { gap: 6px; padding: 1px 4px; }
-  /* Controlli touch ancora più generosi */
-  .cbtn { padding: clamp(16px, 5.5vw, 26px) 0; }
-  /* Overlay nome pilota centrato verticalmente meglio */
-  #overlay-box { top: 82%; padding: 10px 14px; gap: 8px; }
-  #name-input { width: min(180px, 55vw); }
+  flex: 0.9;
 }

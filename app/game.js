@@ -269,29 +269,12 @@ function startMusic() {
 }
 
 // ── Canvas & scale ────────────────────────────────────────────────────────────
-// Dimensioni logiche dinamiche: landscape 800×580, portrait 560×800.
-// In portrait sfruttiamo l'altezza del telefono per un canvas molto più grande.
-let LW = 800, LH = 580;
-let ORIENT = 'landscape';
+const LW = 800, LH = 580;   // logical dimensions
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
 let S = 1;
 
-function computeLogical() {
-  const vv    = window.visualViewport;
-  const viewW = vv ? vv.width  : window.innerWidth;
-  const viewH = vv ? vv.height : window.innerHeight;
-  const portrait = viewH > viewW;
-  const newOrient = portrait ? 'portrait' : 'landscape';
-  const changed = newOrient !== ORIENT;
-  ORIENT = newOrient;
-  if (portrait) { LW = 560; LH = 800; }
-  else          { LW = 800; LH = 580; }
-  return changed;
-}
-
 function resize() {
-  const orientChanged = computeLogical();
   const hudH     = document.getElementById('hud').offsetHeight;
   const actionsH = document.getElementById('game-actions').offsetHeight;
   const ctrlH    = window.matchMedia('(pointer:coarse)').matches
@@ -299,6 +282,7 @@ function resize() {
                      : 0;
   // Buffer generoso: gap del flex + eventuale reflow font + safe area Safari
   const BUFFER = 44;
+  // Safari: innerHeight può sovrastimare (include toolbar). visualViewport è la misura reale.
   const vv     = window.visualViewport;
   const viewW  = vv ? vv.width  : window.innerWidth;
   const viewH  = vv ? vv.height : window.innerHeight;
@@ -310,12 +294,6 @@ function resize() {
   document.getElementById('hud').style.width = canvas.width + 'px';
   document.getElementById('game-actions').style.width = canvas.width + 'px';
   document.getElementById('controls').style.width = canvas.width + 'px';
-
-  // Se l'orientamento è cambiato durante il gameplay, rigenera la wave
-  // con le nuove dimensioni logiche (posizioni invader, shield, player).
-  if (orientChanged && (state === 'playing' || state === 'win')) {
-    initWave();
-  }
 }
 
 // ── Game state ────────────────────────────────────────────────────────────────
@@ -371,41 +349,31 @@ function initWave() {
   eBullets     = [];
   particles    = [];
 
-  const isPortrait = ORIENT === 'portrait';
-
-  player = { x: LW/2, y: LH - 54, w: isPortrait ? 40 : 44, h: 22, cooldown: 0 };
+  player = { x: LW/2, y: LH - 46, w: 44, h: 22, cooldown: 0 };
 
   // Invaders da WAVES (cicla quando supera l'ultimo pattern)
-  // In portrait: usiamo solo 9 colonne centrali del pattern 11-cols per stare nella larghezza ridotta.
   invaders = [];
-  const wavePat   = WAVES[(level - 1) % WAVES.length];
-  const ROWS      = wavePat.length;
-  const COLS      = isPortrait ? 9 : 11;
-  const colOffset = isPortrait ? 1 : 0;   // taglia la colonna 0 e la 10 in portrait
-  const IW = isPortrait ? 30 : 36;
-  const IH = isPortrait ? 20 : 22;
-  const GX = isPortrait ?  8 : 16;
-  const GY = isPortrait ? 14 : 16;
-  const gW      = COLS*IW + (COLS-1)*GX;
-  const startX  = (LW - gW)/2 + IW/2;
-  const startY  = 68;
+  const wave = WAVES[(level - 1) % WAVES.length];
+  const ROWS = wave.length;            // sempre 5
+  const COLS = wave[0].length;         // sempre 11
+  const IW=36, IH=22, GX=16, GY=16;
+  const gW     = COLS*IW + (COLS-1)*GX;
+  const startX = (LW - gW)/2 + IW/2;
+  const startY = 68;
   for (let r=0; r<ROWS; r++) {
     for (let c=0; c<COLS; c++) {
-      if (wavePat[r][c + colOffset] !== '1') continue;
+      if (wave[r][c] !== '1') continue;
       const type = r===0 ? 0 : r<=2 ? 1 : 2;
       const pts  = [30,20,10][type];
       invaders.push({ x: startX + c*(IW+GX), y: startY + r*(IH+GY), w:IW, h:IH, type, pts, alive:true });
     }
   }
 
-  // Shields: 3 bunkers in portrait, 4 in landscape
+  // Shields: 4 bunkers (sempre rigenerati ad ogni wave)
   shields = [];
-  const N  = isPortrait ? 3 : 4;
-  const SW = isPortrait ? 48 : 56;
-  const SH = 36;
-  const BK = 7;
+  const N=4, SW=56, SH=36, BK=7;
   const sp = LW/(N+1);
-  const sy = LH - 130;
+  const sy = LH - 108;
   for (let i=0; i<N; i++) {
     const sx = sp*(i+1) - SW/2;
     const blocks = [];
@@ -745,25 +713,17 @@ function drawGroundLine() {
 function drawStartScreen() {
   drawBg();
 
-  const isPortrait = ORIENT === 'portrait';
-  const titleSize  = isPortrait ? 18 : 22;
-  const titleY1    = isPortrait ? 56 : 68;
-  const titleY2    = titleY1 + titleSize + 6;
-  const hintY      = titleY2 + titleSize + 2;
-  const boardY     = hintY + 18;
+  // Titolo
+  text('VAPORWAVE', LW/2, 68, '#ff71ce', 22);
+  text('INVADERS',  LW/2, 102, '#01cdfe', 22);
+  text('← → TO MOVE   SPACE TO FIRE', LW/2, 134, '#b967ff', 7);
 
-  text('VAPORWAVE', LW/2, titleY1, '#ff71ce', titleSize);
-  text('INVADERS',  LW/2, titleY2, '#01cdfe', titleSize);
-  text(isPortrait ? 'TAP ◀ ▶ TO MOVE · TAP ⦿ TO FIRE'
-                  : '← → TO MOVE   SPACE TO FIRE',
-       LW/2, hintY, '#b967ff', 7);
-
-  drawLeaderboard(LW/2, boardY, null, 5);
+  // Leaderboard top 5 (spazio per l'overlay del nome sotto)
+  drawLeaderboard(LW/2, 170, null, 5);
 }
 
 function drawLeaderboard(cx, startY, highlightIdx, limit) {
   const max = limit || TOP_N;
-  const isPortrait = ORIENT === 'portrait';
   text('— TOP ' + max + ' PILOTS —', cx, startY, '#fffb96', 9);
 
   const list = loadHiScores().slice(0, max);
@@ -773,16 +733,10 @@ function drawLeaderboard(cx, startY, highlightIdx, limit) {
   }
 
   const ROW_H = 22;
-  // In portrait le colonne sono più strette (canvas largo 560 invece di 800)
-  const dRank  = isPortrait ? 120 : 170;
-  const dName  = isPortrait ?  95 : 140;
-  const dScore = isPortrait ?  70 :  60;
-  const dLvl   = isPortrait ? 125 : 170;
-  const fs     = isPortrait ? 7   : 8;
-  const colRank  = cx - dRank;
-  const colName  = cx - dName;
-  const colScore = cx + dScore;
-  const colLvl   = cx + dLvl;
+  const colRank  = cx - 170;
+  const colName  = cx - 140;
+  const colScore = cx + 60;
+  const colLvl   = cx + 170;
   text('#',     colRank,  startY + 24, '#b967ff', 7, 'left');
   text('PILOT', colName,  startY + 24, '#b967ff', 7, 'left');
   text('SCORE', colScore, startY + 24, '#b967ff', 7, 'right');
@@ -794,10 +748,10 @@ function drawLeaderboard(cx, startY, highlightIdx, limit) {
     const blink = isNew ? (Date.now() % 600 < 300) : true;
     if (!blink) return;
     const col = isNew ? '#fffb96' : (i === 0 ? '#ff71ce' : (i < 3 ? '#01cdfe' : '#b967ff'));
-    text(String(i+1).padStart(2,' '), colRank,  y, col, fs, 'left');
-    text(e.name,                      colName,  y, col, fs, 'left');
-    text(String(e.score),             colScore, y, col, fs, 'right');
-    text('W' + (e.level || 1),        colLvl,   y, col, fs, 'right');
+    text(String(i+1).padStart(2,' '), colRank,  y, col, 8, 'left');
+    text(e.name,                      colName,  y, col, 8, 'left');
+    text(String(e.score),             colScore, y, col, 8, 'right');
+    text('W' + (e.level || 1),        colLvl,   y, col, 8, 'right');
   });
 }
 
